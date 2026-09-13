@@ -37,7 +37,7 @@ public class AuthService {
     public MeResponse me() {
         Trabajador t = currentUserService.requireCurrent();
         return new MeResponse(
-                t.getId(), t.getCodigo(), t.getNombreCompleto(), t.getRolSistema().name(),
+                t.getId(), t.getId(), t.getCodigo(), t.getNombreCompleto(), t.getRolSistema().name(),
                 t.getPlaza() == null ? null : t.getPlaza().getId(),
                 t.getPlaza() == null ? null : t.getPlaza().getCodigo(),
                 moduloAccesoService.modulosPara(t.getRolSistema())
@@ -46,7 +46,7 @@ public class AuthService {
 
     private LoginResponse.UsuarioSesion toSesion(Trabajador t) {
         return new LoginResponse.UsuarioSesion(
-                t.getId(), t.getCodigo(), t.getNombreCompleto(), t.getRolSistema().name(),
+                t.getId(), t.getId(), t.getCodigo(), t.getNombreCompleto(), t.getRolSistema().name(),
                 t.getPlaza() == null ? null : t.getPlaza().getId(),
                 t.getPlaza() == null ? null : t.getPlaza().getCodigo(),
                 moduloAccesoService.modulosPara(t.getRolSistema())
