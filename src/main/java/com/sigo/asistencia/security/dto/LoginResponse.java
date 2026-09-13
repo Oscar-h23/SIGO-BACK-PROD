@@ -10,6 +10,7 @@ public record LoginResponse(
 ) {
     public record UsuarioSesion(
             Long id,
+            Long trabajadorId,
             Integer codigo,
             String nombre,
             String rol,
