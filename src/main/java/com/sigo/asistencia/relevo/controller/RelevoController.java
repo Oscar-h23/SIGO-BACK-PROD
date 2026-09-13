@@ -16,6 +16,7 @@ public class RelevoController {
  private final RelevoService service;
  @GetMapping("/elementos") public List<ElementoRelevoResponse> elementos(){ return service.listarElementos(); }
  @PostMapping @ResponseStatus(HttpStatus.CREATED) public RelevoResponse registrar(@Valid @RequestBody RelevoRequest r){ return service.registrar(r); }
+ @PutMapping("/{id}") public RelevoResponse actualizar(@PathVariable Long id,@Valid @RequestBody RelevoRequest r){ return service.actualizar(id,r); }
  @GetMapping("/{id}") public RelevoResponse obtener(@PathVariable Long id){ return service.obtener(id); }
  @GetMapping public List<RelevoResponse> listar(
   @RequestParam(required=false) @DateTimeFormat(iso=DateTimeFormat.ISO.DATE) LocalDate inicio,
@@ -25,9 +26,17 @@ public class RelevoController {
  public EvidenciaRelevoResponse evidenciaChecklist(@PathVariable Long checklistId,@RequestParam("file") MultipartFile file)throws IOException{
   return service.subirEvidenciaChecklist(checklistId,file);
  }
+ @DeleteMapping("/checklist/{checklistId}/evidencias/{evidenciaId}") @ResponseStatus(HttpStatus.NO_CONTENT)
+ public void eliminarEvidenciaChecklist(@PathVariable Long checklistId,@PathVariable Long evidenciaId)throws IOException{
+  service.eliminarEvidenciaChecklist(checklistId,evidenciaId);
+ }
  @PostMapping(value="/vias/{relevoViaId}/evidencias",consumes="multipart/form-data")
  @ResponseStatus(HttpStatus.CREATED)
  public EvidenciaRelevoResponse evidenciaVia(@PathVariable Long relevoViaId,@RequestParam("file") MultipartFile file)throws IOException{
   return service.subirEvidenciaVia(relevoViaId,file);
+ }
+ @DeleteMapping("/vias/{relevoViaId}/evidencias/{evidenciaId}") @ResponseStatus(HttpStatus.NO_CONTENT)
+ public void eliminarEvidenciaVia(@PathVariable Long relevoViaId,@PathVariable Long evidenciaId)throws IOException{
+  service.eliminarEvidenciaVia(relevoViaId,evidenciaId);
  }
 }
