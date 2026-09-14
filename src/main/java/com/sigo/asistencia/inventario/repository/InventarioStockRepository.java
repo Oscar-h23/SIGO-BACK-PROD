@@ -1,15 +1,21 @@
 package com.sigo.asistencia.inventario.repository;
+
 import com.sigo.asistencia.inventario.dto.response.StockActualResponse;
 import lombok.RequiredArgsConstructor;
-import org.springframework.jdbc.core.namedparam.*;
+import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
+import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Repository;
-import java.util.*;
 
-@Repository @RequiredArgsConstructor
+import java.sql.Types;
+import java.util.List;
+
+@Repository
+@RequiredArgsConstructor
 public class InventarioStockRepository {
   private final NamedParameterJdbcTemplate jdbc;
-  public List<StockActualResponse> buscar(Long plazaId,String texto){
-    String sql="""
+
+  public List<StockActualResponse> buscar(Long plazaId, String texto) {
+    String sql = """
       SELECT s.plaza_id,s.plaza,s.producto_id,s.producto,s.unidad_medida,s.cantidad_actual,
              COALESCE(pp.stock_minimo,0) stock_minimo,
              (s.cantidad_actual < COALESCE(pp.stock_minimo,0)) bajo_minimo,
@@ -20,11 +26,16 @@ public class InventarioStockRepository {
         AND (:texto IS NULL OR LOWER(s.producto) LIKE LOWER(CONCAT('%',CAST(:texto AS TEXT),'%')))
       ORDER BY s.plaza,s.producto
       """;
-    var params=new MapSqlParameterSource().addValue("plazaId",plazaId)
-      .addValue("texto",texto==null||texto.isBlank()?null:texto.trim());
-    return jdbc.query(sql,params,(rs,n)->new StockActualResponse(
-      rs.getLong("plaza_id"),rs.getString("plaza"),rs.getLong("producto_id"),rs.getString("producto"),
-      rs.getString("unidad_medida"),rs.getBigDecimal("cantidad_actual"),rs.getInt("stock_minimo"),
-      rs.getBoolean("bajo_minimo"),rs.getLong("inventario_id"),rs.getObject("actualizado_en",java.time.OffsetDateTime.class)));
+
+    String textoNormalizado = texto == null || texto.isBlank() ? null : texto.trim();
+    var params = new MapSqlParameterSource()
+      .addValue("plazaId", plazaId, Types.BIGINT)
+      .addValue("texto", textoNormalizado, Types.VARCHAR);
+
+    return jdbc.query(sql, params, (rs, n) -> new StockActualResponse(
+      rs.getLong("plaza_id"), rs.getString("plaza"), rs.getLong("producto_id"), rs.getString("producto"),
+      rs.getString("unidad_medida"), rs.getBigDecimal("cantidad_actual"), rs.getInt("stock_minimo"),
+      rs.getBoolean("bajo_minimo"), rs.getLong("inventario_id"),
+      rs.getObject("actualizado_en", java.time.OffsetDateTime.class)));
   }
 }
