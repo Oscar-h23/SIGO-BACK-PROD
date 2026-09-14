@@ -8,6 +8,7 @@ import com.sigo.asistencia.inventario.security.InventarioUsuarioActual;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.http.HttpStatus;
+import org.springframework.jdbc.core.RowCallbackHandler;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.jdbc.core.namedparam.SqlParameterSource;
@@ -219,6 +220,10 @@ public class InventarioProductoUpdateService {
   private Map<String, Long> obtenerRolesActivos(Set<String> codigos) {
     if (codigos.isEmpty()) return Map.of();
     Map<String, Long> resultado = new LinkedHashMap<>();
+
+    RowCallbackHandler handler = rs ->
+        resultado.put(rs.getString("codigo"), rs.getLong("id"));
+
     jdbc.query(
         """
         SELECT id, UPPER(codigo) AS codigo
@@ -226,7 +231,7 @@ public class InventarioProductoUpdateService {
         WHERE activo = true AND UPPER(codigo) IN (:codigos)
         """,
         new MapSqlParameterSource("codigos", codigos),
-        rs -> resultado.put(rs.getString("codigo"), rs.getLong("id"))
+        handler
     );
     return resultado;
   }
@@ -284,6 +289,12 @@ public class InventarioProductoUpdateService {
   private Map<Long, PlazaConfig> obtenerPlazasActivas(Set<Long> ids) {
     if (ids.isEmpty()) return Map.of();
     Map<Long, PlazaConfig> resultado = new LinkedHashMap<>();
+
+    RowCallbackHandler handler = rs -> {
+      long id = rs.getLong("id");
+      resultado.put(id, new PlazaConfig(id, rs.getString("codigo"), 0));
+    };
+
     jdbc.query(
         """
         SELECT id, codigo
@@ -291,10 +302,7 @@ public class InventarioProductoUpdateService {
         WHERE activo = true AND id IN (:ids)
         """,
         new MapSqlParameterSource("ids", ids),
-        rs -> {
-          long id = rs.getLong("id");
-          resultado.put(id, new PlazaConfig(id, rs.getString("codigo"), 0));
-        }
+        handler
     );
     return resultado;
   }
