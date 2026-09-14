@@ -1,5 +1,6 @@
 package com.sigo.asistencia.personal.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -33,6 +34,7 @@ public class Trabajador {
     @Column(name = "rol_sistema", nullable = false, length = 30)
     private RolSistema rolSistema = RolSistema.OPERADOR;
 
+    @JsonIgnore
     @Column(name = "password_hash", length = 100)
     private String passwordHash;
 
