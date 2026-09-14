@@ -28,10 +28,4 @@ public class Turno {
 
     @Column(length = 30)
     private String nombre;
-
-    @Column(
-            name = "personal_programado",
-            nullable = false
-    )
-    private Integer personalProgramado;
 }
