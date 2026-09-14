@@ -33,6 +33,8 @@ public class ChatController {
             );
         }
 
-        return ResponseEntity.ok(new ChatResponse(chatService.procesar(request.message())));
+        return ResponseEntity.ok(new ChatResponse(
+                chatService.procesar(request.message(), request.historySegura())
+        ));
     }
 }
