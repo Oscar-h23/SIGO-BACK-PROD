@@ -46,14 +46,34 @@ public class InventarioController {
       @RequestParam(required=false) @DateTimeFormat(iso=DateTimeFormat.ISO.DATE) LocalDate hasta,
       @RequestParam(defaultValue="0") int page,@RequestParam(defaultValue="12") int size){
     InventarioUsuarioActual actual=usuarios.obtenerActual();
-    exigirGestion(actual);
+    validarConsultaHistorial(actual,plazaId,responsableId,rol,estado,desde,hasta,page,size);
     return service.historial(actual,plazaId,responsableId,rol,estado,desde,hasta,page,size);
   }
 
-  private void exigirGestion(InventarioUsuarioActual actual){
-    RolSistema rol=actual.trabajador().getRolSistema();
-    if(rol!=RolSistema.CONTROLADOR && rol!=RolSistema.SUPERVISOR){
-      throw new ResponseStatusException(HttpStatus.FORBIDDEN,"Solo controladores y supervisores pueden consultar el historial de inventario");
+  private void validarConsultaHistorial(
+      InventarioUsuarioActual actual, Long plazaId, Long responsableId, String rol,
+      EstadoInventario estado, LocalDate desde, LocalDate hasta, int page, int size){
+    RolSistema rolSistema=actual.trabajador().getRolSistema();
+    if(rolSistema==RolSistema.CONTROLADOR || rolSistema==RolSistema.SUPERVISOR){
+      return;
+    }
+
+    // El formulario de Nuevo inventario necesita recuperar el conteo EN_PROCESO
+    // del propio operador. Esto no habilita el historial general para OPERADOR.
+    boolean recuperacionPropia=rolSistema==RolSistema.OPERADOR
+        && responsableId!=null
+        && responsableId.equals(actual.trabajador().getId())
+        && estado==EstadoInventario.EN_PROCESO
+        && plazaId==null
+        && rol==null
+        && desde==null
+        && hasta==null
+        && page==0
+        && size==1;
+
+    if(!recuperacionPropia){
+      throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+          "Solo controladores y supervisores pueden consultar el historial de inventario");
     }
   }
 }
