@@ -27,48 +27,106 @@ public class GeminiService {
     private String model;
 
     public SigoChatPlan interpretar(String pregunta) {
-        if (apiKey == null || apiKey.isBlank()) {
-            throw new IllegalStateException("GEMINI_API_KEY no está configurada.");
-        }
-
+        exigirApiKey();
         String prompt = construirPrompt(pregunta);
 
         Map<String, Object> body = Map.of(
-                "contents", List.of(
-                        Map.of(
-                                "role", "user",
-                                "parts", List.of(Map.of("text", prompt))
-                        )
-                ),
+                "contents", List.of(Map.of(
+                        "role", "user",
+                        "parts", List.of(Map.of("text", prompt))
+                )),
                 "generationConfig", Map.of(
                         "temperature", 0,
                         "responseMimeType", "application/json"
                 )
         );
 
-        String url = "https://generativelanguage.googleapis.com/v1beta/models/"
-                + model + ":generateContent?key=" + apiKey;
-
-        String responseBody = ejecutarConReintentos(url, body);
+        String responseBody = ejecutarConReintentos(url(), body);
 
         try {
-            JsonNode root = objectMapper.readTree(responseBody);
-            String json = root.path("candidates")
-                    .path(0)
-                    .path("content")
-                    .path("parts")
-                    .path(0)
-                    .path("text")
-                    .asText();
-
+            String json = extraerTexto(responseBody);
             if (json == null || json.isBlank()) {
                 throw new IllegalStateException("Gemini devolvió una respuesta vacía.");
             }
-
             return objectMapper.readValue(json, SigoChatPlan.class);
         } catch (Exception e) {
             throw new IllegalStateException("No se pudo interpretar la respuesta de Gemini.", e);
         }
+    }
+
+    public String responderNatural(String pregunta, String datosSigo) {
+        exigirApiKey();
+
+        String prompt = """
+                Eres el Asistente SIGO de Lima Expresa.
+                Responde en español natural, claro y profesional, como un asistente conversacional útil.
+
+                REGLAS OBLIGATORIAS:
+                - Responde exclusivamente con la información entregada en DATOS SIGO.
+                - No inventes datos, causas, nombres, fechas ni conclusiones que no estén sustentadas.
+                - Si falta información para responder algo, dilo de forma natural.
+                - Evita formatos técnicos como "Sección:", pipes (|), nombres de campos de base de datos o listados mecánicos.
+                - No repitas todos los datos si no son necesarios para responder la pregunta.
+                - Prioriza una respuesta directa en el primer enunciado y luego agrega contexto útil.
+                - Usa porcentajes y cantidades de manera natural.
+                - Si hay varios indicadores, intégralos en frases fáciles de leer.
+                - Puedes usar viñetas solo cuando realmente ayuden a comparar varios elementos.
+                - No uses Markdown complejo ni tablas.
+                - Mantén la respuesta normalmente entre 2 y 6 oraciones.
+
+                Ejemplo de estilo:
+                En septiembre, la asistencia fue de 91.73%%: se registraron 122 presentes de 133 programados. Además, hubo 11 ausencias y se solicitó apoyo en 3 ocasiones. En ese mismo periodo se registraron 4 relevos, sin elementos ni vías observadas.
+
+                PREGUNTA DEL USUARIO:
+                %s
+
+                DATOS SIGO:
+                %s
+                """.formatted(pregunta, datosSigo);
+
+        Map<String, Object> body = Map.of(
+                "contents", List.of(Map.of(
+                        "role", "user",
+                        "parts", List.of(Map.of("text", prompt))
+                )),
+                "generationConfig", Map.of(
+                        "temperature", 0.25,
+                        "maxOutputTokens", 500
+                )
+        );
+
+        String responseBody = ejecutarConReintentos(url(), body);
+        try {
+            String texto = extraerTexto(responseBody);
+            if (texto == null || texto.isBlank()) {
+                throw new IllegalStateException("Gemini devolvió una respuesta vacía.");
+            }
+            return texto.trim();
+        } catch (Exception e) {
+            throw new IllegalStateException("No se pudo redactar la respuesta del asistente.", e);
+        }
+    }
+
+    private void exigirApiKey() {
+        if (apiKey == null || apiKey.isBlank()) {
+            throw new IllegalStateException("GEMINI_API_KEY no está configurada.");
+        }
+    }
+
+    private String url() {
+        return "https://generativelanguage.googleapis.com/v1beta/models/"
+                + model + ":generateContent?key=" + apiKey;
+    }
+
+    private String extraerTexto(String responseBody) throws Exception {
+        JsonNode root = objectMapper.readTree(responseBody);
+        return root.path("candidates")
+                .path(0)
+                .path("content")
+                .path("parts")
+                .path(0)
+                .path("text")
+                .asText();
     }
 
     private String ejecutarConReintentos(String url, Map<String, Object> body) {
