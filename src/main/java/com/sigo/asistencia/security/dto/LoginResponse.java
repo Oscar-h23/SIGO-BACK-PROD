@@ -16,6 +16,7 @@ public record LoginResponse(
             String rol,
             Long plazaId,
             String plaza,
-            List<String> modulos
+            List<String> modulos,
+            Boolean requiereCambioPassword
     ) {}
 }
