@@ -12,6 +12,7 @@ import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.io.IOException;
 import java.time.LocalDate;
@@ -39,7 +40,11 @@ public class RelevoController {
 
     @PutMapping("/{id}")
     public RelevoResponse actualizar(@PathVariable Long id, @Valid @RequestBody RelevoRequest request) {
-        return service.actualizar(id, asegurarIdentidadOperador(request));
+        Trabajador actual = currentUserService.requireCurrent();
+        if (actual.getRolSistema() == RolSistema.OPERADOR) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Los operadores solo pueden consultar el historial de relevos");
+        }
+        return service.actualizar(id, request);
     }
 
     @GetMapping("/{id}")
@@ -88,7 +93,7 @@ public class RelevoController {
         }
 
         if (actual.getPlaza() == null) {
-            throw new org.springframework.web.server.ResponseStatusException(
+            throw new ResponseStatusException(
                     HttpStatus.FORBIDDEN,
                     "El operador no tiene una plaza asignada"
             );
