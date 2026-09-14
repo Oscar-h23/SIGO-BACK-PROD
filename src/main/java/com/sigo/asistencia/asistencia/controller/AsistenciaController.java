@@ -5,16 +5,18 @@ import com.sigo.asistencia.asistencia.dto.AsistenciaResponse;
 import com.sigo.asistencia.asistencia.dto.AsistenciaUpdateRequest;
 import com.sigo.asistencia.asistencia.dto.EvidenciaResponse;
 import com.sigo.asistencia.asistencia.service.AsistenciaService;
-
+import com.sigo.asistencia.personal.entity.RolSistema;
+import com.sigo.asistencia.personal.entity.Trabajador;
+import com.sigo.asistencia.security.service.CurrentUserService;
 import jakarta.validation.Valid;
-
 import lombok.RequiredArgsConstructor;
-
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.io.IOException;
 import java.time.LocalDate;
@@ -26,120 +28,48 @@ import java.util.List;
 public class AsistenciaController {
 
     private final AsistenciaService asistenciaService;
+    private final CurrentUserService currentUserService;
 
-    /*
-     * =========================================================
-     * REGISTRAR ASISTENCIA
-     * =========================================================
-     */
     @PostMapping
     public ResponseEntity<AsistenciaResponse> registrar(
             @Valid @RequestBody AsistenciaRequest request
     ) {
-
         return ResponseEntity.ok(
-                asistenciaService.registrar(request)
+                asistenciaService.registrar(asegurarIdentidad(request))
         );
     }
 
-    /*
-     * =========================================================
-     * ACTUALIZAR ASISTENCIA
-     * =========================================================
-     *
-     * PUT /api/asistencias/1
-     */
     @PutMapping("/{id}")
     public ResponseEntity<AsistenciaResponse> actualizar(
             @PathVariable Long id,
             @Valid @RequestBody AsistenciaUpdateRequest request
     ) {
-
         return ResponseEntity.ok(
-                asistenciaService.actualizar(
-                        id,
-                        request
-                )
+                asistenciaService.actualizar(id, asegurarIdentidad(request))
         );
     }
 
-    /*
-     * =========================================================
-     * LISTAR ASISTENCIAS
-     * =========================================================
-     *
-     * Ejemplos:
-     *
-     * GET /api/asistencias
-     *
-     * Por defecto:
-     * inicio = hoy
-     * fin = hoy
-     * plaza = todas
-     *
-     * GET /api/asistencias?plazaId=3
-     *
-     * GET /api/asistencias
-     * ?inicio=2026-09-01
-     * &fin=2026-09-02
-     *
-     * GET /api/asistencias
-     * ?inicio=2026-09-01
-     * &fin=2026-09-02
-     * &plazaId=3
-     */
     @GetMapping
     public ResponseEntity<List<AsistenciaResponse>> listar(
-
             @RequestParam(required = false)
             @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
             LocalDate inicio,
-
             @RequestParam(required = false)
             @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
             LocalDate fin,
-
             @RequestParam(required = false)
             Long plazaId
     ) {
-
         return ResponseEntity.ok(
-                asistenciaService.listar(
-                        inicio,
-                        fin,
-                        plazaId
-                )
+                asistenciaService.listar(inicio, fin, plazaId)
         );
     }
 
-    /*
-     * =========================================================
-     * OBTENER ASISTENCIA POR ID
-     * =========================================================
-     */
     @GetMapping("/{id}")
-    public ResponseEntity<AsistenciaResponse> obtenerPorId(
-            @PathVariable Long id
-    ) {
-
-        return ResponseEntity.ok(
-                asistenciaService.obtenerPorId(id)
-        );
+    public ResponseEntity<AsistenciaResponse> obtenerPorId(@PathVariable Long id) {
+        return ResponseEntity.ok(asistenciaService.obtenerPorId(id));
     }
 
-    /*
-     * =========================================================
-     * SUBIR EVIDENCIA
-     * =========================================================
-     *
-     * POST /api/asistencias/1/evidencias
-     *
-     * Body:
-     * form-data
-     *
-     * file = imagen
-     * tipo = CALENTAMIENTO | INICIO_TURNO | TAPONES_AUDITIVOS
-     */
     @PostMapping(
             value = "/{id}/evidencias",
             consumes = MediaType.MULTIPART_FORM_DATA_VALUE
@@ -149,39 +79,82 @@ public class AsistenciaController {
             @RequestParam("file") MultipartFile file,
             @RequestParam("tipo") String tipo
     ) throws IOException {
-
+        exigirRolAsistencia();
         return ResponseEntity.ok(
-                asistenciaService.guardarEvidencia(
-                        id,
-                        file,
-                        tipo
-                )
+                asistenciaService.guardarEvidencia(id, file, tipo)
         );
     }
 
-    /*
-     * =========================================================
-     * ELIMINAR EVIDENCIA
-     * =========================================================
-     *
-     * DELETE
-     * /api/asistencias/1/evidencias/5
-     */
-    @DeleteMapping(
-            "/{asistenciaId}/evidencias/{evidenciaId}"
-    )
+    @DeleteMapping("/{asistenciaId}/evidencias/{evidenciaId}")
     public ResponseEntity<Void> eliminarEvidencia(
             @PathVariable Long asistenciaId,
             @PathVariable Long evidenciaId
     ) throws IOException {
+        exigirRolAsistencia();
+        asistenciaService.eliminarEvidencia(asistenciaId, evidenciaId);
+        return ResponseEntity.noContent().build();
+    }
 
-        asistenciaService.eliminarEvidencia(
-                asistenciaId,
-                evidenciaId
+    private AsistenciaRequest asegurarIdentidad(AsistenciaRequest request) {
+        Trabajador actual = exigirRolAsistencia();
+
+        if (actual.getRolSistema() == RolSistema.SUPERVISOR) {
+            return request;
+        }
+
+        if (actual.getPlaza() == null) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "El controlador no tiene una plaza asignada");
+        }
+
+        return new AsistenciaRequest(
+                actual.getPlaza().getId(),
+                request.turnoId(),
+                actual.getId(),
+                request.fecha(),
+                request.programados(),
+                request.presentes(),
+                request.apoyoSolicitado(),
+                request.detalleApoyo(),
+                request.notas(),
+                request.ausencias(),
+                request.evidencias()
         );
+    }
 
-        return ResponseEntity
-                .noContent()
-                .build();
+    private AsistenciaUpdateRequest asegurarIdentidad(AsistenciaUpdateRequest request) {
+        Trabajador actual = exigirRolAsistencia();
+
+        if (actual.getRolSistema() == RolSistema.SUPERVISOR) {
+            return request;
+        }
+
+        if (actual.getPlaza() == null) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "El controlador no tiene una plaza asignada");
+        }
+
+        return new AsistenciaUpdateRequest(
+                actual.getPlaza().getId(),
+                request.turnoId(),
+                actual.getId(),
+                request.fecha(),
+                request.programados(),
+                request.presentes(),
+                request.apoyoSolicitado(),
+                request.detalleApoyo(),
+                request.notas(),
+                request.ausencias()
+        );
+    }
+
+    private Trabajador exigirRolAsistencia() {
+        Trabajador actual = currentUserService.requireCurrent();
+        if (actual.getRolSistema() != RolSistema.SUPERVISOR
+                && actual.getRolSistema() != RolSistema.CONTROLADOR) {
+            throw new ResponseStatusException(
+                    HttpStatus.FORBIDDEN,
+                    "Solo supervisores y controladores pueden gestionar asistencia"
+            );
+        }
+        return actual;
     }
 }
