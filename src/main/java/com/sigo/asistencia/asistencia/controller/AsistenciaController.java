@@ -5,6 +5,7 @@ import com.sigo.asistencia.asistencia.dto.AsistenciaResponse;
 import com.sigo.asistencia.asistencia.dto.AsistenciaUpdateRequest;
 import com.sigo.asistencia.asistencia.dto.EvidenciaResponse;
 import com.sigo.asistencia.asistencia.service.AsistenciaExcepcionService;
+import com.sigo.asistencia.asistencia.service.AsistenciaProgramacionService;
 import com.sigo.asistencia.asistencia.service.AsistenciaService;
 import com.sigo.asistencia.personal.entity.RolSistema;
 import com.sigo.asistencia.personal.entity.Trabajador;
@@ -22,6 +23,7 @@ import org.springframework.web.server.ResponseStatusException;
 import java.io.IOException;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/asistencias")
@@ -30,6 +32,7 @@ public class AsistenciaController {
 
     private final AsistenciaService asistenciaService;
     private final AsistenciaExcepcionService asistenciaExcepcionService;
+    private final AsistenciaProgramacionService programacionService;
     private final CurrentUserService currentUserService;
 
     @PostMapping
@@ -38,10 +41,12 @@ public class AsistenciaController {
             @RequestParam(defaultValue = "false") boolean excepcionControlador
     ) {
         exigirRolAsistencia();
+        AsistenciaRequest seguro = aplicarProgramados(asegurarIdentidad(request));
         if (excepcionControlador) {
-            return ResponseEntity.ok(asistenciaExcepcionService.registrar(request));
+            seguro = aplicarProgramados(request);
+            return ResponseEntity.ok(asistenciaExcepcionService.registrar(seguro));
         }
-        return ResponseEntity.ok(asistenciaService.registrar(asegurarIdentidad(request)));
+        return ResponseEntity.ok(asistenciaService.registrar(seguro));
     }
 
     @PutMapping("/{id}")
@@ -49,7 +54,20 @@ public class AsistenciaController {
             @PathVariable Long id,
             @Valid @RequestBody AsistenciaUpdateRequest request
     ) {
-        return ResponseEntity.ok(asistenciaService.actualizar(id, asegurarIdentidad(request)));
+        AsistenciaUpdateRequest seguro = aplicarProgramados(asegurarIdentidad(request));
+        return ResponseEntity.ok(asistenciaService.actualizar(id, seguro));
+    }
+
+    @GetMapping("/programados")
+    public ResponseEntity<Map<String, Integer>> programados(
+            @RequestParam Long plazaId,
+            @RequestParam Long turnoId
+    ) {
+        exigirRolAsistencia();
+        return ResponseEntity.ok(Map.of(
+                "programados",
+                programacionService.obtenerProgramados(plazaId, turnoId)
+        ));
     }
 
     @GetMapping
@@ -84,6 +102,24 @@ public class AsistenciaController {
         exigirRolAsistencia();
         asistenciaService.eliminarEvidencia(asistenciaId, evidenciaId);
         return ResponseEntity.noContent().build();
+    }
+
+    private AsistenciaRequest aplicarProgramados(AsistenciaRequest request) {
+        int programados = programacionService.obtenerProgramados(request.plazaId(), request.turnoId());
+        return new AsistenciaRequest(
+                request.plazaId(), request.turnoId(), request.controladorId(), request.fecha(),
+                programados, request.presentes(), request.apoyoSolicitado(), request.detalleApoyo(),
+                request.notas(), request.ausencias(), request.evidencias()
+        );
+    }
+
+    private AsistenciaUpdateRequest aplicarProgramados(AsistenciaUpdateRequest request) {
+        int programados = programacionService.obtenerProgramados(request.plazaId(), request.turnoId());
+        return new AsistenciaUpdateRequest(
+                request.plazaId(), request.turnoId(), request.controladorId(), request.fecha(),
+                programados, request.presentes(), request.apoyoSolicitado(), request.detalleApoyo(),
+                request.notas(), request.ausencias()
+        );
     }
 
     private AsistenciaRequest asegurarIdentidad(AsistenciaRequest request) {
