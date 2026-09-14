@@ -26,9 +26,9 @@ public class GeminiService {
     @Value("${gemini.model:gemini-3.6-flash}")
     private String model;
 
-    public SigoChatPlan interpretar(String pregunta) {
+    public SigoChatPlan interpretar(String pregunta, String contextoConversacion) {
         exigirApiKey();
-        String prompt = construirPrompt(pregunta);
+        String prompt = construirPrompt(pregunta, contextoConversacion);
 
         Map<String, Object> body = Map.of(
                 "contents", List.of(Map.of(
@@ -54,7 +54,7 @@ public class GeminiService {
         }
     }
 
-    public String responderNatural(String pregunta, String datosSigo) {
+    public String responderNatural(String pregunta, String contextoConversacion, String datosSigo) {
         exigirApiKey();
 
         String prompt = """
@@ -63,6 +63,7 @@ public class GeminiService {
 
                 REGLAS OBLIGATORIAS:
                 - Responde exclusivamente con la información entregada en DATOS SIGO.
+                - El HISTORIAL solo sirve para entender referencias como "y ayer", "esa plaza" o "ese trabajador"; nunca lo uses como fuente de datos actuales si DATOS SIGO no lo confirma.
                 - No inventes datos, causas, nombres, fechas ni conclusiones que no estén sustentadas.
                 - Si falta información para responder algo, dilo de forma natural.
                 - Evita formatos técnicos como "Sección:", pipes (|), nombres de campos de base de datos o listados mecánicos.
@@ -71,18 +72,22 @@ public class GeminiService {
                 - Usa porcentajes y cantidades de manera natural.
                 - Si hay varios indicadores, intégralos en frases fáciles de leer.
                 - Puedes usar viñetas solo cuando realmente ayuden a comparar varios elementos.
-                - No uses Markdown complejo ni tablas.
+                - No uses tablas.
                 - Mantén la respuesta normalmente entre 2 y 6 oraciones.
+                - Si la pregunta es una continuación, responde como continuación, sin reiniciar la conversación.
 
                 Ejemplo de estilo:
                 En septiembre, la asistencia fue de 91.73%%: se registraron 122 presentes de 133 programados. Además, hubo 11 ausencias y se solicitó apoyo en 3 ocasiones. En ese mismo periodo se registraron 4 relevos, sin elementos ni vías observadas.
 
-                PREGUNTA DEL USUARIO:
+                HISTORIAL RECIENTE:
+                %s
+
+                PREGUNTA ACTUAL:
                 %s
 
                 DATOS SIGO:
                 %s
-                """.formatted(pregunta, datosSigo);
+                """.formatted(contextoConversacion, pregunta, datosSigo);
 
         Map<String, Object> body = Map.of(
                 "contents", List.of(Map.of(
@@ -131,35 +136,22 @@ public class GeminiService {
 
     private String ejecutarConReintentos(String url, Map<String, Object> body) {
         int maxIntentos = 3;
-
         for (int intento = 1; intento <= maxIntentos; intento++) {
             try {
-                return restClient.post()
-                        .uri(url)
-                        .body(body)
-                        .retrieve()
-                        .body(String.class);
+                return restClient.post().uri(url).body(body).retrieve().body(String.class);
             } catch (RestClientResponseException e) {
                 int status = e.getStatusCode().value();
                 boolean temporal = status == 429 || status == 503;
-
                 if (temporal && intento < maxIntentos) {
                     dormir(700L * intento);
                     continue;
                 }
-
                 if (temporal) {
-                    throw new IllegalStateException(
-                            "El asistente de IA está temporalmente ocupado. Intenta nuevamente en unos segundos."
-                    );
+                    throw new IllegalStateException("El asistente de IA está temporalmente ocupado. Intenta nuevamente en unos segundos.");
                 }
-
-                throw new IllegalStateException(
-                        "Error de Gemini: " + e.getStatusCode() + " - " + e.getResponseBodyAsString()
-                );
+                throw new IllegalStateException("Error de Gemini: " + e.getStatusCode() + " - " + e.getResponseBodyAsString());
             }
         }
-
         throw new IllegalStateException("No se pudo obtener respuesta de Gemini.");
     }
 
@@ -172,16 +164,21 @@ public class GeminiService {
         }
     }
 
-    private String construirPrompt(String pregunta) {
+    private String construirPrompt(String pregunta, String contextoConversacion) {
         LocalDate hoy = LocalDate.now();
 
         return """
                 Eres el intérprete de consultas del sistema SIGO.
                 NO respondas la pregunta del usuario.
-                Tu única tarea es devolver JSON válido indicando qué herramientas
-                de SOLO LECTURA necesita ejecutar el backend.
+                Tu única tarea es devolver JSON válido indicando qué herramientas de SOLO LECTURA necesita ejecutar el backend.
 
                 Fecha actual: %s
+
+                CONTEXTO DE CONVERSACIÓN:
+                %s
+
+                Usa el contexto únicamente para resolver referencias de la pregunta actual como "y ayer", "esa plaza", "ese trabajador" o "lo mismo".
+                La herramienta debe corresponder siempre a la PREGUNTA ACTUAL.
 
                 Áreas disponibles:
                 - Trabajadores
@@ -256,14 +253,8 @@ public class GeminiService {
                 - Para fotos usa EVIDENCIAS_ASISTENCIA o EVIDENCIAS_RELEVO.
                 - limite máximo 50.
 
-                Ejemplos:
-                "¿Cuándo faltó el código 1139?" -> AUSENCIAS codigo=1139.
-                "¿Qué pasó en P4 este mes?" -> RESUMEN_GENERAL plaza=P4 y rango del mes.
-                "¿Qué vías estuvieron observadas?" -> VIAS estado=OBSERVADO.
-                "¿Hay fotos del relevo 18?" -> EVIDENCIAS_RELEVO relevoId=18.
-
-                Pregunta del usuario:
+                PREGUNTA ACTUAL:
                 %s
-                """.formatted(hoy, pregunta);
+                """.formatted(hoy, contextoConversacion, pregunta);
     }
 }
