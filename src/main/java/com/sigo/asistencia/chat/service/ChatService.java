@@ -23,7 +23,7 @@ public class ChatService {
             List<SigoToolRequest> herramientas = plan.toolsSeguras();
 
             if (herramientas.isEmpty()) {
-                return "No pude determinar qué información de SIGO consultar.";
+                return "No encontré una consulta concreta que pueda resolver con la información disponible en SIGO. Puedes preguntarme, por ejemplo, por asistencia, ausencias, relevos o vías.";
             }
 
             List<SigoToolResult> resultados = new ArrayList<>();
@@ -31,7 +31,17 @@ public class ChatService {
                 resultados.add(queryService.ejecutar(herramienta));
             }
 
-            return formatter.formatear(resultados);
+            String datos = formatter.formatear(resultados);
+            if (datos == null || datos.isBlank()) {
+                return "No encontré información registrada en SIGO para responder esa consulta.";
+            }
+
+            try {
+                return geminiService.responderNatural(mensaje, datos);
+            } catch (Exception naturalError) {
+                System.err.println("No se pudo naturalizar la respuesta del chat: " + naturalError.getMessage());
+                return datos;
+            }
         } catch (Exception e) {
             System.err.println("Error en Asistente SIGO: " + e.getMessage());
             e.printStackTrace();
