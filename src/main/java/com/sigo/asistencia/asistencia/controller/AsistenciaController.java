@@ -4,6 +4,7 @@ import com.sigo.asistencia.asistencia.dto.AsistenciaRequest;
 import com.sigo.asistencia.asistencia.dto.AsistenciaResponse;
 import com.sigo.asistencia.asistencia.dto.AsistenciaUpdateRequest;
 import com.sigo.asistencia.asistencia.dto.EvidenciaResponse;
+import com.sigo.asistencia.asistencia.service.AsistenciaExcepcionService;
 import com.sigo.asistencia.asistencia.service.AsistenciaService;
 import com.sigo.asistencia.personal.entity.RolSistema;
 import com.sigo.asistencia.personal.entity.Trabajador;
@@ -28,15 +29,19 @@ import java.util.List;
 public class AsistenciaController {
 
     private final AsistenciaService asistenciaService;
+    private final AsistenciaExcepcionService asistenciaExcepcionService;
     private final CurrentUserService currentUserService;
 
     @PostMapping
     public ResponseEntity<AsistenciaResponse> registrar(
-            @Valid @RequestBody AsistenciaRequest request
+            @Valid @RequestBody AsistenciaRequest request,
+            @RequestParam(defaultValue = "false") boolean excepcionControlador
     ) {
-        return ResponseEntity.ok(
-                asistenciaService.registrar(asegurarIdentidad(request))
-        );
+        exigirRolAsistencia();
+        if (excepcionControlador) {
+            return ResponseEntity.ok(asistenciaExcepcionService.registrar(request));
+        }
+        return ResponseEntity.ok(asistenciaService.registrar(asegurarIdentidad(request)));
     }
 
     @PutMapping("/{id}")
@@ -44,25 +49,16 @@ public class AsistenciaController {
             @PathVariable Long id,
             @Valid @RequestBody AsistenciaUpdateRequest request
     ) {
-        return ResponseEntity.ok(
-                asistenciaService.actualizar(id, asegurarIdentidad(request))
-        );
+        return ResponseEntity.ok(asistenciaService.actualizar(id, asegurarIdentidad(request)));
     }
 
     @GetMapping
     public ResponseEntity<List<AsistenciaResponse>> listar(
-            @RequestParam(required = false)
-            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
-            LocalDate inicio,
-            @RequestParam(required = false)
-            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
-            LocalDate fin,
-            @RequestParam(required = false)
-            Long plazaId
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate inicio,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fin,
+            @RequestParam(required = false) Long plazaId
     ) {
-        return ResponseEntity.ok(
-                asistenciaService.listar(inicio, fin, plazaId)
-        );
+        return ResponseEntity.ok(asistenciaService.listar(inicio, fin, plazaId));
     }
 
     @GetMapping("/{id}")
@@ -70,19 +66,14 @@ public class AsistenciaController {
         return ResponseEntity.ok(asistenciaService.obtenerPorId(id));
     }
 
-    @PostMapping(
-            value = "/{id}/evidencias",
-            consumes = MediaType.MULTIPART_FORM_DATA_VALUE
-    )
+    @PostMapping(value = "/{id}/evidencias", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<EvidenciaResponse> subirEvidencia(
             @PathVariable Long id,
             @RequestParam("file") MultipartFile file,
             @RequestParam("tipo") String tipo
     ) throws IOException {
         exigirRolAsistencia();
-        return ResponseEntity.ok(
-                asistenciaService.guardarEvidencia(id, file, tipo)
-        );
+        return ResponseEntity.ok(asistenciaService.guardarEvidencia(id, file, tipo));
     }
 
     @DeleteMapping("/{asistenciaId}/evidencias/{evidenciaId}")
@@ -97,63 +88,34 @@ public class AsistenciaController {
 
     private AsistenciaRequest asegurarIdentidad(AsistenciaRequest request) {
         Trabajador actual = exigirRolAsistencia();
-
-        if (actual.getRolSistema() == RolSistema.SUPERVISOR) {
-            return request;
-        }
-
+        if (actual.getRolSistema() == RolSistema.SUPERVISOR) return request;
         if (actual.getPlaza() == null) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "El controlador no tiene una plaza asignada");
         }
-
         return new AsistenciaRequest(
-                actual.getPlaza().getId(),
-                request.turnoId(),
-                actual.getId(),
-                request.fecha(),
-                request.programados(),
-                request.presentes(),
-                request.apoyoSolicitado(),
-                request.detalleApoyo(),
-                request.notas(),
-                request.ausencias(),
-                request.evidencias()
+                actual.getPlaza().getId(), request.turnoId(), actual.getId(), request.fecha(),
+                request.programados(), request.presentes(), request.apoyoSolicitado(),
+                request.detalleApoyo(), request.notas(), request.ausencias(), request.evidencias()
         );
     }
 
     private AsistenciaUpdateRequest asegurarIdentidad(AsistenciaUpdateRequest request) {
         Trabajador actual = exigirRolAsistencia();
-
-        if (actual.getRolSistema() == RolSistema.SUPERVISOR) {
-            return request;
-        }
-
+        if (actual.getRolSistema() == RolSistema.SUPERVISOR) return request;
         if (actual.getPlaza() == null) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "El controlador no tiene una plaza asignada");
         }
-
         return new AsistenciaUpdateRequest(
-                actual.getPlaza().getId(),
-                request.turnoId(),
-                actual.getId(),
-                request.fecha(),
-                request.programados(),
-                request.presentes(),
-                request.apoyoSolicitado(),
-                request.detalleApoyo(),
-                request.notas(),
-                request.ausencias()
+                actual.getPlaza().getId(), request.turnoId(), actual.getId(), request.fecha(),
+                request.programados(), request.presentes(), request.apoyoSolicitado(),
+                request.detalleApoyo(), request.notas(), request.ausencias()
         );
     }
 
     private Trabajador exigirRolAsistencia() {
         Trabajador actual = currentUserService.requireCurrent();
-        if (actual.getRolSistema() != RolSistema.SUPERVISOR
-                && actual.getRolSistema() != RolSistema.CONTROLADOR) {
-            throw new ResponseStatusException(
-                    HttpStatus.FORBIDDEN,
-                    "Solo supervisores y controladores pueden gestionar asistencia"
-            );
+        if (actual.getRolSistema() != RolSistema.SUPERVISOR && actual.getRolSistema() != RolSistema.CONTROLADOR) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Solo supervisores y controladores pueden gestionar asistencia");
         }
         return actual;
     }
