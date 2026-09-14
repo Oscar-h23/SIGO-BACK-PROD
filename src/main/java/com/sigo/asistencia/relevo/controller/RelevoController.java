@@ -3,6 +3,7 @@ package com.sigo.asistencia.relevo.controller;
 import com.sigo.asistencia.personal.entity.RolSistema;
 import com.sigo.asistencia.personal.entity.Trabajador;
 import com.sigo.asistencia.relevo.dto.*;
+import com.sigo.asistencia.relevo.service.RelevoHistorialAccesoService;
 import com.sigo.asistencia.relevo.service.RelevoService;
 import com.sigo.asistencia.security.service.CurrentUserService;
 import jakarta.validation.Valid;
@@ -22,6 +23,7 @@ import java.util.List;
 public class RelevoController {
 
     private final RelevoService service;
+    private final RelevoHistorialAccesoService historialAccesoService;
     private final CurrentUserService currentUserService;
 
     @GetMapping("/elementos")
@@ -42,14 +44,16 @@ public class RelevoController {
 
     @GetMapping("/{id}")
     public RelevoResponse obtener(@PathVariable Long id) {
-        return service.obtener(id);
+        Trabajador actual = currentUserService.requireCurrent();
+        return historialAccesoService.obtenerPara(actual, id);
     }
 
     @GetMapping
     public List<RelevoResponse> listar(
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate inicio,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fin) {
-        return service.listar(inicio, fin);
+        Trabajador actual = currentUserService.requireCurrent();
+        return historialAccesoService.listarPara(actual, inicio, fin);
     }
 
     @PostMapping(value = "/checklist/{checklistId}/evidencias", consumes = "multipart/form-data")
