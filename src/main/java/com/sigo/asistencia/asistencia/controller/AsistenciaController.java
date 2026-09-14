@@ -41,12 +41,16 @@ public class AsistenciaController {
             @RequestParam(defaultValue = "false") boolean excepcionControlador
     ) {
         exigirRolAsistencia();
-        AsistenciaRequest seguro = aplicarProgramados(asegurarIdentidad(request));
+
         if (excepcionControlador) {
-            seguro = aplicarProgramados(request);
-            return ResponseEntity.ok(asistenciaExcepcionService.registrar(seguro));
+            return ResponseEntity.ok(
+                    asistenciaExcepcionService.registrar(request)
+            );
         }
-        return ResponseEntity.ok(asistenciaService.registrar(seguro));
+
+        return ResponseEntity.ok(
+                asistenciaService.registrar(asegurarIdentidad(request))
+        );
     }
 
     @PutMapping("/{id}")
@@ -54,10 +58,16 @@ public class AsistenciaController {
             @PathVariable Long id,
             @Valid @RequestBody AsistenciaUpdateRequest request
     ) {
-        AsistenciaUpdateRequest seguro = aplicarProgramados(asegurarIdentidad(request));
-        return ResponseEntity.ok(asistenciaService.actualizar(id, seguro));
+        return ResponseEntity.ok(
+                asistenciaService.actualizar(id, asegurarIdentidad(request))
+        );
     }
 
+    /**
+     * Devuelve la cantidad programada sugerida para la combinación plaza + turno.
+     * Este valor se usa como autocompletado en el frontend, pero puede ser ajustado
+     * manualmente antes de registrar o actualizar la asistencia.
+     */
     @GetMapping("/programados")
     public ResponseEntity<Map<String, Integer>> programados(
             @RequestParam Long plazaId,
@@ -104,34 +114,25 @@ public class AsistenciaController {
         return ResponseEntity.noContent().build();
     }
 
-    private AsistenciaRequest aplicarProgramados(AsistenciaRequest request) {
-        int programados = programacionService.obtenerProgramados(request.plazaId(), request.turnoId());
-        return new AsistenciaRequest(
-                request.plazaId(), request.turnoId(), request.controladorId(), request.fecha(),
-                programados, request.presentes(), request.apoyoSolicitado(), request.detalleApoyo(),
-                request.notas(), request.ausencias(), request.evidencias()
-        );
-    }
-
-    private AsistenciaUpdateRequest aplicarProgramados(AsistenciaUpdateRequest request) {
-        int programados = programacionService.obtenerProgramados(request.plazaId(), request.turnoId());
-        return new AsistenciaUpdateRequest(
-                request.plazaId(), request.turnoId(), request.controladorId(), request.fecha(),
-                programados, request.presentes(), request.apoyoSolicitado(), request.detalleApoyo(),
-                request.notas(), request.ausencias()
-        );
-    }
-
     private AsistenciaRequest asegurarIdentidad(AsistenciaRequest request) {
         Trabajador actual = exigirRolAsistencia();
         if (actual.getRolSistema() == RolSistema.SUPERVISOR) return request;
         if (actual.getPlaza() == null) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "El controlador no tiene una plaza asignada");
         }
+
         return new AsistenciaRequest(
-                actual.getPlaza().getId(), request.turnoId(), actual.getId(), request.fecha(),
-                request.programados(), request.presentes(), request.apoyoSolicitado(),
-                request.detalleApoyo(), request.notas(), request.ausencias(), request.evidencias()
+                actual.getPlaza().getId(),
+                request.turnoId(),
+                actual.getId(),
+                request.fecha(),
+                request.programados(),
+                request.presentes(),
+                request.apoyoSolicitado(),
+                request.detalleApoyo(),
+                request.notas(),
+                request.ausencias(),
+                request.evidencias()
         );
     }
 
@@ -141,17 +142,29 @@ public class AsistenciaController {
         if (actual.getPlaza() == null) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "El controlador no tiene una plaza asignada");
         }
+
         return new AsistenciaUpdateRequest(
-                actual.getPlaza().getId(), request.turnoId(), actual.getId(), request.fecha(),
-                request.programados(), request.presentes(), request.apoyoSolicitado(),
-                request.detalleApoyo(), request.notas(), request.ausencias()
+                actual.getPlaza().getId(),
+                request.turnoId(),
+                actual.getId(),
+                request.fecha(),
+                request.programados(),
+                request.presentes(),
+                request.apoyoSolicitado(),
+                request.detalleApoyo(),
+                request.notas(),
+                request.ausencias()
         );
     }
 
     private Trabajador exigirRolAsistencia() {
         Trabajador actual = currentUserService.requireCurrent();
-        if (actual.getRolSistema() != RolSistema.SUPERVISOR && actual.getRolSistema() != RolSistema.CONTROLADOR) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Solo supervisores y controladores pueden gestionar asistencia");
+        if (actual.getRolSistema() != RolSistema.SUPERVISOR
+                && actual.getRolSistema() != RolSistema.CONTROLADOR) {
+            throw new ResponseStatusException(
+                    HttpStatus.FORBIDDEN,
+                    "Solo supervisores y controladores pueden gestionar asistencia"
+            );
         }
         return actual;
     }
