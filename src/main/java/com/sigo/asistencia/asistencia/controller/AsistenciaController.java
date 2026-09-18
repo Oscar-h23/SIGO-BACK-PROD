@@ -115,46 +115,17 @@ public class AsistenciaController {
     }
 
     private AsistenciaRequest asegurarIdentidad(AsistenciaRequest request) {
-        Trabajador actual = exigirRolAsistencia();
-        if (actual.getRolSistema() == RolSistema.SUPERVISOR) return request;
-        if (actual.getPlaza() == null) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "El controlador no tiene una plaza asignada");
-        }
-
-        return new AsistenciaRequest(
-                actual.getPlaza().getId(),
-                request.turnoId(),
-                request.controladorId(),
-                request.fecha(),
-                request.programados(),
-                request.presentes(),
-                request.apoyoSolicitado(),
-                request.detalleApoyo(),
-                request.notas(),
-                request.ausencias(),
-                request.evidencias()
-        );
+        // Supervisores y controladores pueden registrar asistencia en cualquier plaza.
+        // La plaza válida es la seleccionada explícitamente en el formulario.
+        exigirRolAsistencia();
+        return request;
     }
 
     private AsistenciaUpdateRequest asegurarIdentidad(AsistenciaUpdateRequest request) {
-        Trabajador actual = exigirRolAsistencia();
-        if (actual.getRolSistema() == RolSistema.SUPERVISOR) return request;
-        if (actual.getPlaza() == null) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "El controlador no tiene una plaza asignada");
-        }
-
-        return new AsistenciaUpdateRequest(
-                actual.getPlaza().getId(),
-                request.turnoId(),
-                request.controladorId(),
-                request.fecha(),
-                request.programados(),
-                request.presentes(),
-                request.apoyoSolicitado(),
-                request.detalleApoyo(),
-                request.notas(),
-                request.ausencias()
-        );
+        // Supervisores y controladores pueden actualizar registros de cualquier plaza.
+        // No se reemplaza plazaId por la plaza asignada al usuario autenticado.
+        exigirRolAsistencia();
+        return request;
     }
 
     private Trabajador exigirRolAsistencia() {
