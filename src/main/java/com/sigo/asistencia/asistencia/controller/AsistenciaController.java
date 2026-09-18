@@ -124,7 +124,7 @@ public class AsistenciaController {
         return new AsistenciaRequest(
                 actual.getPlaza().getId(),
                 request.turnoId(),
-                actual.getId(),
+                request.controladorId(),
                 request.fecha(),
                 request.programados(),
                 request.presentes(),
@@ -146,7 +146,7 @@ public class AsistenciaController {
         return new AsistenciaUpdateRequest(
                 actual.getPlaza().getId(),
                 request.turnoId(),
-                actual.getId(),
+                request.controladorId(),
                 request.fecha(),
                 request.programados(),
                 request.presentes(),
