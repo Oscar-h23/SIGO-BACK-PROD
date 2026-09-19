@@ -242,6 +242,8 @@ public class ProgramacionService {
 
         miembroRepository.deleteByGrupoId(grupo.getId());
         miembroRepository.deleteByTrabajadorIdIn(distintos);
+        miembroRepository.flush();
+
         for (Trabajador agente : agentes) {
             GrupoTrabajoMiembro m = new GrupoTrabajoMiembro();
             m.setGrupo(grupo);
