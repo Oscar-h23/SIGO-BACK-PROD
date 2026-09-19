@@ -12,14 +12,14 @@ public class ModuloAccesoService {
         return switch (rol) {
             case SUPERVISOR -> List.of(
                     "DASHBOARD", "RELEVOS", "ASISTENCIA", "INVENTARIO",
-                    "ADMIN_PRODUCTOS", "TRABAJADORES", "CHAT"
+                    "ADMIN_PRODUCTOS", "TRABAJADORES", "PROGRAMACION", "CHAT"
             );
             case CONTROLADOR -> List.of(
                     "DASHBOARD", "RELEVOS", "ASISTENCIA", "INVENTARIO",
-                    "ADMIN_PRODUCTOS", "CHAT"
+                    "ADMIN_PRODUCTOS", "PROGRAMACION", "CHAT"
             );
             case OPERADOR -> List.of(
-                    "RELEVOS", "INVENTARIO"
+                    "RELEVOS", "INVENTARIO", "PROGRAMACION"
             );
         };
     }

@@ -39,6 +39,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/chat/**").hasAnyRole("SUPERVISOR", "CONTROLADOR")
                         .requestMatchers("/api/inventario/productos/**").hasAnyRole("SUPERVISOR", "CONTROLADOR")
                         .requestMatchers("/api/inventario/catalogos/**").hasAnyRole("SUPERVISOR", "CONTROLADOR")
+                        .requestMatchers("/api/programacion/**").hasAnyRole("SUPERVISOR", "CONTROLADOR", "OPERADOR")
                         .requestMatchers("/api/relevos/**", "/api/vias/**").hasAnyRole("SUPERVISOR", "CONTROLADOR", "OPERADOR")
                         .requestMatchers("/api/inventarios/**", "/api/inventario/me", "/api/inventario/stock/**")
                             .hasAnyRole("SUPERVISOR", "CONTROLADOR", "OPERADOR")
