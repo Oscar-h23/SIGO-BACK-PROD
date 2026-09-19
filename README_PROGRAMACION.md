@@ -144,3 +144,6 @@ mvn spring-boot:run
 ```
 
 El backend sigue incluyendo Asistencia, Relevos, Inventario, Chat, Personal y Seguridad; Programación se agrega como un módulo nuevo.
+
+
+> Rama de trabajo local: `chatgpt/programacion-distribucion-local`.
